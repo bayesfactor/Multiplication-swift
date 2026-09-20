@@ -28,11 +28,14 @@ struct ContentView: View {
                         } else {
                             ScrollView {
                                 VStack {
-                                    // Progress counter
-                                    Text("\(gameState.numCorrect)/\(gameState.numQuestions)")
-                                        .font(.system(size: min(40, geometry.size.width * 0.1)))
-                                        .foregroundColor(.blue)
-                                        .padding(.top)
+                                    // Daily points indicator (points scored today / daily target)
+                                    HStack {
+                                        Spacer()
+                                        Text("\(gameState.pointsToday)/\(gameState.dailyTarget)")
+                                            .font(.system(size: min(40, geometry.size.width * 0.1)))
+                                            .foregroundColor(.blue)
+                                    }
+                                    .padding([.top, .trailing])
                                     
                                     // Multiplication problem
                                     HStack {
@@ -105,6 +108,7 @@ struct ContentView: View {
         
         if answer == gameState.num1 * gameState.num2 {
             gameState.numCorrect += 1
+            gameState.addPoints(gameState.num1 * gameState.num2)
             gameState.feedbackText = "Correct!"
             gameState.feedbackColor = .green
             
@@ -241,13 +245,65 @@ class GameState: ObservableObject {
     @Published var color1: Color = .random
     @Published var color2: Color = .random
     @Published var colorX: Color = .random
-    
+    @Published var pointsToday: Int = 0
+
     let numQuestions = 10
     private var lowerBound = 0
     private var upperBound = 5
-    
+
+    // Persistence for the daily points total.
+    private let pointsKey = "pointsToday"
+    private let pointsDateKey = "pointsDate"
+
+    // Point target schedule: 3300 on 2026-09-21, increasing 100 per calendar
+    // day thereafter. Dates before the start clamp to 3300.
+    var dailyTarget: Int {
+        let calendar = Calendar.current
+        var start = DateComponents()
+        start.year = 2026
+        start.month = 9
+        start.day = 21
+        guard let startDate = calendar.date(from: start) else { return 3300 }
+        let startDay = calendar.startOfDay(for: startDate)
+        let today = calendar.startOfDay(for: Date())
+        let days = calendar.dateComponents([.day], from: startDay, to: today).day ?? 0
+        return 3300 + 100 * max(0, days)
+    }
+
     init() {
+        loadPoints()
         updateProblem()
+    }
+
+    func addPoints(_ amount: Int) {
+        loadPoints() // roll over if the day changed since launch
+        pointsToday += amount
+        savePoints()
+    }
+
+    private static func dayString(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private func loadPoints() {
+        let defaults = UserDefaults.standard
+        let today = GameState.dayString(for: Date())
+        if defaults.string(forKey: pointsDateKey) == today {
+            pointsToday = defaults.integer(forKey: pointsKey)
+        } else {
+            pointsToday = 0
+            defaults.set(today, forKey: pointsDateKey)
+            defaults.set(0, forKey: pointsKey)
+        }
+    }
+
+    private func savePoints() {
+        let defaults = UserDefaults.standard
+        defaults.set(GameState.dayString(for: Date()), forKey: pointsDateKey)
+        defaults.set(pointsToday, forKey: pointsKey)
     }
     
     func updateProblem() {
