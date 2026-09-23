@@ -108,7 +108,7 @@ struct ContentView: View {
         
         if answer == gameState.num1 * gameState.num2 {
             gameState.numCorrect += 1
-            gameState.addPoints(gameState.num1 * gameState.num2)
+            gameState.awardForCorrect()
             gameState.feedbackText = "Correct!"
             gameState.feedbackColor = .green
             
@@ -119,6 +119,7 @@ struct ContentView: View {
                 gameState.updateProblem()
             }
         } else {
+            gameState.registerWrongAttempt()
             gameState.feedbackText = "Please try again"
             gameState.feedbackColor = .red
         }
@@ -251,6 +252,10 @@ class GameState: ObservableObject {
     private var lowerBound = 0
     private var upperBound = 5
 
+    // Per-problem scoring state (accuracy + speed).
+    private var problemStartTime = Date()
+    private var wrongAttempts = 0
+
     // Persistence for the daily points total.
     private let pointsKey = "pointsToday"
     private let pointsDateKey = "pointsDate"
@@ -279,6 +284,21 @@ class GameState: ObservableObject {
         loadPoints() // roll over if the day changed since launch
         pointsToday += amount
         savePoints()
+    }
+
+    func registerWrongAttempt() {
+        wrongAttempts += 1
+    }
+
+    // Award points for a correct answer, scaled by speed and accuracy.
+    // Speed: 1.0 at <=2s, decaying linearly to 0.2 at >=10s.
+    // Accuracy: 1.0 with no wrong attempts, -0.25 each, floored at 0.25.
+    func awardForCorrect() {
+        let elapsed = Date().timeIntervalSince(problemStartTime)
+        let speedFactor = max(0.2, min(1.0, 1.0 - (elapsed - 2.0) / 8.0 * 0.8))
+        let accuracyFactor = max(0.25, 1.0 - 0.25 * Double(wrongAttempts))
+        let points = max(1, Int((100.0 * speedFactor * accuracyFactor).rounded()))
+        addPoints(points)
     }
 
     private static func dayString(for date: Date) -> String {
@@ -312,6 +332,8 @@ class GameState: ObservableObject {
         color1 = .random
         color2 = .random
         colorX = .random
+        problemStartTime = Date()
+        wrongAttempts = 0
         //feedbackText = " "
     }
     
