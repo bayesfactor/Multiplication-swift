@@ -349,35 +349,27 @@ class GameState: ObservableObject {
     }
 
     func updateProblem() {
+        let (range1, range2) = operandRanges
         switch operation {
-        case .multiplication:
-            let (lo, hi) = operandRange
-            operand1 = Int.random(in: lo...hi)
-            operand2 = Int.random(in: lo...hi)
-            answer = operand1 * operand2
-        case .multiplication2Digit:
-            let (lo, hi) = operandRange
-            operand1 = Int.random(in: lo...hi)
-            operand2 = Int.random(in: lo...hi)
+        case .multiplication, .multiplication2Digit:
+            operand1 = Int.random(in: range1)
+            operand2 = Int.random(in: range2)
             answer = operand1 * operand2
         case .division:
             // Build from a divisor and quotient so the result is always an integer.
-            let (lo, hi) = operandRange
-            let divisor = Int.random(in: lo...hi)
-            let quotient = Int.random(in: lo...hi)
+            let quotient = Int.random(in: range1)
+            let divisor = Int.random(in: range2)
             operand1 = divisor * quotient
             operand2 = divisor
             answer = quotient
         case .addition:
-            let (lo, hi) = operandRange
-            operand1 = Int.random(in: lo...hi)
-            operand2 = Int.random(in: lo...hi)
+            operand1 = Int.random(in: range1)
+            operand2 = Int.random(in: range2)
             answer = operand1 + operand2
         case .subtraction:
             // Order operands so the answer is never negative (no minus key).
-            let (lo, hi) = operandRange
-            let a = Int.random(in: lo...hi)
-            let b = Int.random(in: lo...hi)
+            let a = Int.random(in: range1)
+            let b = Int.random(in: range2)
             operand1 = max(a, b)
             operand2 = min(a, b)
             answer = operand1 - operand2
@@ -409,33 +401,33 @@ class GameState: ObservableObject {
         updateProblem()
     }
 
-    // Inclusive operand range for the current operation and difficulty.
-    // For division this bounds both the divisor and the quotient.
-    private var operandRange: (Int, Int) {
+    // Inclusive ranges for operand1 and operand2 at the current operation and
+    // difficulty. For division these bound the quotient and the divisor.
+    private var operandRanges: (ClosedRange<Int>, ClosedRange<Int>) {
         switch operation {
         case .multiplication:
             switch difficulty {
-            case .easy:   return (0, 5)
-            case .medium: return (3, 8)
-            case .hard:   return (3, 12)
+            case .easy:   return (0...5, 0...5)
+            case .medium: return (3...8, 3...8)
+            case .hard:   return (3...12, 3...12)
             }
         case .multiplication2Digit:
             switch difficulty {
-            case .easy:   return (10, 20)
-            case .medium: return (10, 50)
-            case .hard:   return (10, 99)
+            case .easy:   return (10...20, 2...5)   // 2-digit × 1-digit
+            case .medium: return (10...99, 2...9)   // 2-digit × 1-digit
+            case .hard:   return (10...99, 10...99)  // 2-digit × 2-digit
             }
         case .division:
             switch difficulty {
-            case .easy:   return (2, 5)
-            case .medium: return (2, 9)
-            case .hard:   return (2, 12)
+            case .easy:   return (2...5, 2...5)
+            case .medium: return (2...9, 2...9)
+            case .hard:   return (2...12, 2...12)
             }
         case .addition, .subtraction:
             switch difficulty {
-            case .easy:   return (10, 99)    // 2-digit
-            case .medium: return (100, 500)  // 3-digit
-            case .hard:   return (100, 999)  // 3-digit
+            case .easy:   return (10...99, 10...99)     // 2-digit
+            case .medium: return (100...500, 100...500) // 3-digit
+            case .hard:   return (100...999, 100...999) // 3-digit
             }
         }
     }
